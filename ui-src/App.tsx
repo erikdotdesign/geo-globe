@@ -8,6 +8,7 @@ import { getPathGenerator, getCountryContinentCode, getRelPathData, patchId, get
 import Select from "./Select";
 import Button from "./Button";
 import Control from "./Control";
+import ResetSettingButton from "./ResetSettingButton";
 import "./App.css";
 
 const TOPO_JSON: any = { countries110m };
@@ -38,6 +39,9 @@ const projections = {
   },{
     name: "Conic Equidistant",
     value: "geoConicEquidistant"
+  },{
+    name: "Albers",
+    value: "geoAlbers"
   }],
   cylindrical: [{
     name: "Equirectangular",
@@ -69,6 +73,10 @@ const App = () => {
   const [projectionType, setProjectionType] = useState<string>("geoMercator");
   const [includeGraticules, setIncludeGraticules] = useState<boolean>(true);
   const [graticulePathData, setGraticulePathData] = useState<string | null>(null);
+  const [outlinePathData, setOutlinePathData] = useState<string | null>(null);
+  const [scale, setScale] = useState<number>(120);
+  const [rotate, setRotate] = useState<[number, number, number]>([0.1, 0, 0]);
+  const [defaultScaleMap, setDefaultScaleMap] = useState<Record<string, number>>({});
 
   const getPatchedCountryFeatures = (json: Topology<{ countries: GeometryCollection }>) => {
     const countryFeatures = feature(json, json.objects.countries);
@@ -122,6 +130,8 @@ const App = () => {
       if (msg.type === "storage-loaded") {
         if (msg.key === "cache" && msg.value) {
           setProjectionType(msg.value.projectionType);
+          setScale(msg.value.scale);
+          setRotate(msg.value.rotate);
           setIncludeGraticules(msg.value.includeGraticules);
           setIncludeCountryBorders(msg.value.includeCountryBorders);
         }
@@ -134,21 +144,29 @@ const App = () => {
     handleNewDataSet(dataSet);
   }, [dataSet]);
 
-  // Handle updating path data
-  useEffect(() => {
+  const handlePathData = () => {
     if (!countryFeatures.length || !countryGeometries.length) return;
     const continentGeometryMap = getContinentGeometryMap();
     const projectionFeatures = Object.values(continentGeometryMap);
-    const pathGenerator = getPathGenerator(projectionFeatures, projectionType);
+    const { pathGenerator, scaleMap } = getPathGenerator(projectionFeatures, projectionType, defaultScaleMap, { scale, rotate });
+
+    setOutlinePathData(pathGenerator({ type: "Sphere" }));
+    setDefaultScaleMap(scaleMap);
+
+    if (scale < scaleMap[projectionType]) {
+      setScale(scaleMap[projectionType]);
+    }
 
     setContinentPathData(projectionFeatures.map((pf, i) => ({
       name: (pf.properties as any).name,
       pathData: getRelPathData(pathGenerator, projectionFeatures[i])
-    })));
+    })).filter(e => e.pathData));
 
     if (includeGraticules) {
-      const graticulePathData = getGraticulePathData(projectionType);
+      const graticulePathData = getGraticulePathData(pathGenerator);
       setGraticulePathData(graticulePathData);
+    } else {
+      setGraticulePathData(null);
     }
 
     if (includeCountryBorders) {
@@ -179,14 +197,21 @@ const App = () => {
     } else {
       setCountryPathData({});
     }
+  }
+
+  // Handle updating path data
+  useEffect(() => {
+    handlePathData();
     parent.postMessage({
       pluginMessage: { type: "save-storage", key: "cache", value: {
         projectionType,
+        scale,
+        rotate,
         includeGraticules,
         includeCountryBorders
       }},
     }, "*");
-  }, [includeCountryBorders, includeGraticules, countryFeatures, countryGeometries, projectionType]);
+  }, [includeCountryBorders, includeGraticules, countryFeatures, countryGeometries, projectionType, scale, rotate]);
 
   const handleSetIncludeCountryBorders = (e: React.ChangeEvent<HTMLInputElement>) => {
     setIncludeCountryBorders(e.target.checked);
@@ -200,8 +225,10 @@ const App = () => {
           pluginMessage: { 
             type: "create-geo-globe", 
             pathData: {
+              graticulePathData,
               continentPathData,
-              countryPathData
+              countryPathData,
+              outlinePathData
             }
           } 
         },
@@ -217,37 +244,75 @@ const App = () => {
           geo-globe
         </div>
         <Select
-        label="Projection"
-        value={projectionType}
-        onChange={(e) => setProjectionType(e.target.value)}>
-        {
-          Object.keys(projections).map((key) => (
-            <optgroup label={key}>
-              {
-                projections[key].map((p) => (
-                  <option 
-                    key={p.value}
-                    value={p.value}>
-                    {p.name}
-                  </option>
-                ))
-              }
-            </optgroup>
-          ))
-        }
-      </Select>
-      <Control
-        as="input"
-        type="checkbox"
-        label="Include Graticule"
-        checked={includeGraticules}
-        onChange={(e) => setIncludeGraticules(e.target.checked)} />
-        <Control
+          label="Projection"
+          value={projectionType}
+          onChange={(e) => setProjectionType(e.target.value)}>
+          {
+            Object.keys(projections).map((key) => (
+              <optgroup label={key}>
+                {
+                  projections[key].map((p) => (
+                    <option 
+                      key={p.value}
+                      value={p.value}>
+                      {p.name}
+                    </option>
+                  ))
+                }
+              </optgroup>
+            ))
+          }
+        </Select>
+        <div className="c-control-group">
+          <Control
+            as="input"
+            type="range"
+            label="Scale"
+            min={defaultScaleMap[projectionType] || 0}
+            max="1000" 
+            value={scale}
+            right={<span>{(Number(scale) - Number(defaultScaleMap[projectionType])).toFixed(0)}</span>}
+            rightReadOnly
+            onChange={(e) => setScale(e.target.value)} />
+          <ResetSettingButton
+            onClick={() => setScale(defaultScaleMap[projectionType])} />
+        </div>
+        <div className="c-control-group">
+          <Control
+            as="input"
+            type="range"
+            label="Rotate Lambda"
+            min="-180" 
+            max="180" 
+            value={rotate[0]}
+            right={<span>{rotate[0]}</span>}
+            rightReadOnly
+            onChange={(e) => setRotate([e.target.value, rotate[1], rotate[2]])} />
+          <ResetSettingButton
+            onClick={() => setRotate([0, rotate[1], rotate[2]])} />
+        </div>
+        <div className="c-control-group">
+          <Control
+            as="input"
+            type="range"
+            label="Rotate Pha"
+            min="-180" 
+            max="180" 
+            value={rotate[1]}
+            right={<span>{rotate[1]}</span>}
+            rightReadOnly
+            onChange={(e) => setRotate([rotate[0], e.target.value, rotate[2]])} />
+          <ResetSettingButton
+            onClick={() => setRotate([rotate[0], 0, rotate[2]])} />
+        </div>
+        {/* <Control
           as="input"
-          type="checkbox"
-          label="Include countries"
-          checked={includeCountryBorders}
-          onChange={handleSetIncludeCountryBorders} />
+          type="range"
+          label="Rotate Gamma"
+          min="-180" 
+          max="180" 
+          value={rotate[2]}
+          onChange={(e) => setRotate([rotate[0], rotate[1], e.target.value])} /> */}
         <div className="c-app__geo-preview">
           <svg style={{fill: "none"}}>
             <path d={graticulePathData ? graticulePathData : ""} />
@@ -268,7 +333,22 @@ const App = () => {
               </g>
             ))}
           </svg>
+          <svg style={{fill: "none"}}>
+            <path d={outlinePathData ? outlinePathData : ""} />
+          </svg>
         </div>
+        <Control
+          as="input"
+          type="checkbox"
+          label="Include Graticule"
+          checked={includeGraticules}
+          onChange={(e) => setIncludeGraticules(e.target.checked)} />
+        <Control
+          as="input"
+          type="checkbox"
+          label="Include countries"
+          checked={includeCountryBorders}
+          onChange={handleSetIncludeCountryBorders} />
       </section>
       <footer className="c-app__footer">
         <Button 

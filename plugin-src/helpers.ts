@@ -118,29 +118,48 @@ export const getBackgroundColor = () => {
   return bgPaint?.color ?? { r: 1, g: 1, b: 1 };
 };
 
-export const createVectorFromPath = (pathData: string, bgColor: RGB): VectorNode => {
+const isValidPath = (pathData: string) => {
+  if (!pathData) return false;
+  const cleaned = pathData.trim();
+  // Must contain more than just a move command
+  return /[MLCQAZmlcqa]/.test(cleaned) && /[LCQAZlcqaz]/.test(cleaned);
+}
+
+export const createVectorFromPath = (pathData: string, bgColor: RGB, outline: boolean = false): VectorNode => {
+  const geoFill = getGeoFill();
   const vector = figma.createVector();
   vector.vectorPaths = [{
     windingRule: "NONZERO",
     data: cleanSvgPathData(pathData),
   }];
-  vector.fills = [{ type: "SOLID", color: getGeoFill() }];
-  vector.strokes = [{ type: "SOLID", color: bgColor }];
+  vector.fills = outline ? [] : [{ type: "SOLID", color: geoFill }];
+  vector.strokes = [{ type: "SOLID", color: outline ? geoFill : bgColor }];
   vector.strokeWeight = 0.5;
   vector.lockAspectRatio();
   return vector;
 };
 
-export const createPathDataGroup = ({ name, pathData }: { name: string; pathData: string }): GroupNode => {
+export const createPathDataGroup = (
+  { name, pathData }: { name: string; pathData: string }, 
+  outline?: boolean
+): GroupNode => {
   const bgColor = getBackgroundColor();
   const subpaths = splitIntoSubpaths(pathData);
-  const vectors = subpaths.map(subpath => createVectorFromPath(subpath, bgColor));
+
+  const vectors = subpaths
+    .filter(isValidPath) // Filter out degenerate paths
+    .map(subpath => createVectorFromPath(subpath, bgColor, outline));
+
   const group = groupAndLock(vectors, name);
   return group;
 };
 
-export const createPathDataGroups = (groupName: string, pathDataGroups: { name: string; pathData: string }[]): GroupNode => {
-  const groups = pathDataGroups.map(createPathDataGroup);
+export const createPathDataGroups = (
+  groupName: string, 
+  pathDataGroups: { name: string; pathData: string }[], 
+  outline?: boolean
+): GroupNode => {
+  const groups = pathDataGroups.map((e) => createPathDataGroup(e, outline));
   const group = groupAndLock(groups, groupName);
   return group;
 };

@@ -1,33 +1,85 @@
 import * as d3Geo from "d3-geo";
 import type { FeatureCollection, Feature } from "geojson";
-import { GeoPath, geoGraticule, geoPath } from "d3-geo";
+import { GeoPath, geoGraticule, geoPath, geoGraticule10 } from "d3-geo";
 import isoCountries from "i18n-iso-countries";
 import { getCountryData, TCountryCode } from "countries-list";
 
 export const getPathGenerator = (
   features: Feature | Feature[],
-  projectionType: any
+  projectionType: any,
+  defaultScaleMap: Record<string, number>,
+  params: {
+    scale?: number;            // optional: if undefined, use default fitted scale
+    rotate?: [number, number, number];
+    size?: [number, number];
+  } = {
+    rotate: [0.1, 0, 0],
+    size: [302, 302]
+  }
 ) => {
+  const size = params.size || [302, 302];
   const normalizedFeatures = Array.isArray(features) ? features : [features];
-  const collection: FeatureCollection = {
+
+  // Combine your features with the graticule feature for fitting
+  const graticuleFeature = geoGraticule10();
+  const combinedFeatures = {
     type: "FeatureCollection",
-    features: normalizedFeatures,
+    features: [...normalizedFeatures, graticuleFeature]
   };
-  const projection = d3Geo[projectionType]().fitSize([302, 302], collection);
-  return d3Geo.geoPath(projection);
-};
 
-export const getGraticulePathData = (projectionType: any) => {
-  const graticule = geoGraticule();
+  const projection = d3Geo[projectionType]();
 
-  // Create a projection *without* fitSize, with fixed scale and translate
-  const projection = d3Geo[projectionType]()
-    .scale(150)               // example scale; adjust to your svg size
-    .translate([151, 151]);   // half of your 302x302 SVG size
+  // Fit projection to combined features (including graticules)
+  const padding = getProjectionPadding(projectionType);
+  const paddedSize: [number, number] = [size[0] - padding * 2, size[1] - padding * 2];
+  projection.fitSize(paddedSize, combinedFeatures);
+
+  // Store default scale if not set
+  if (!(projectionType in defaultScaleMap)) {
+    defaultScaleMap[projectionType] = projection.scale();
+  }
+
+  // Use provided scale or default scale
+  projection.scale(params.scale ?? defaultScaleMap[projectionType]);
+
+  // Center & translate and rotate
+  projection
+    .center([0, 0])
+    .translate([size[0] / 2, size[1] / 2])
+    .rotate(params.rotate ?? [0, 0, 0])
+    .clipExtent([[0, 0], size]);
 
   const pathGenerator = geoPath(projection);
 
-  return pathGenerator(graticule());
+  return {
+    pathGenerator,
+    scaleMap: defaultScaleMap
+  };
+};
+
+export const getProjectionPadding = (projectionType: string) => {
+  switch(projectionType) {
+    case "geoAzimuthalEquidistant":
+      return 32
+    case "geoAzimuthalEqualArea":
+      return 12;
+    case "geoGnomonic":
+      return 8;
+    case "geoOrthographic":
+      return 2;
+    case "geoStereographic":
+      return 28;
+    case "geoConicEquidistant":
+      return 2;
+    case "geoAlbers":
+      return 6;
+    case "geoEqualEarth":
+      return 4;
+    case "geoNaturalEarth1":
+      return 3;
+    default:
+      return 0;
+  }
 };
 
 export const getRelPathData = (
@@ -40,6 +92,13 @@ export const getRelPathData = (
     features: normalizedFeatures
   };
   return pathGenerator(featureCollection) as string;
+};
+
+export const getGraticulePathData = (
+  pathGenerator: GeoPath
+) => {
+  const graticule = geoGraticule();
+  return pathGenerator(graticule());
 };
 
 export const capitalize = (str: string): string => {
