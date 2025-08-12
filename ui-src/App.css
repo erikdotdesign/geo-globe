@@ -1,0 +1,135 @@
+:root {
+  --font-family: "Mozilla Text", sans-serif;
+  --font-family-headline: "Mozilla Headline", sans-serif;
+  --font-family-mono: "IBM Plex Mono", monospace;
+  --border-radius: 0px;
+  --control-addon-size: 40px;
+}
+
+.figma-light {
+  --color-primary: #1E1E1E;
+  --color-primary-hover: #121212;
+  --color-gray: #6E6E6E;
+  --color-gray-hover: #5A5A5A;
+  --color-bg-z0: #ffffff;
+  --color-bg-z1: #F7F7F7;
+  --color-bg-z2: #EFEFEF;
+  --color-bg-z3: #E6E6E6;
+  --color-border-z0: #EBEBEB;
+  --color-border-z1: #E3E3E3;
+  --color-border-z2: #DCDCDC;
+  --color-border-z3: #D4D4D4;
+  --color-border-glass: color-mix(in srgb, #000000 10%, transparent);
+  --color-blue: #0288D1;
+  --color-blue-hover: #026FA8;
+  --color-green: #2E7D32;
+  --color-green-hover: #256628;
+  --color-yellow: #ED6C02;
+  --color-yellow-hover: #C65A02;
+  --color-red: #D32F2F;
+  --color-red-hover: #AB2727;
+  --color-purple: #8E24AA;
+  --color-purple-hover: #691B7E;
+  --color-text-base: #000000;
+  --color-text-light: color-mix(in srgb, var(--color-text-base) 75%, transparent);
+  --color-text-lighter: color-mix(in srgb, var(--color-text-base) 50%, transparent);
+  --color-text-base-on-primary: #FFFFFF;
+}
+
+.figma-dark {
+  --color-primary: #F7F7F7;
+  --color-primary-hover: #ffffff;
+  --color-gray: #B0B0B0;
+  --color-gray-hover: #C2C2C2;
+  --color-bg-z0: #121212;
+  --color-bg-z1: #1E1E1E;
+  --color-bg-z2: #2A2A2A;
+  --color-bg-z3: #363636;
+  --color-border-z0: #252525;
+  --color-border-z1: #303030;
+  --color-border-z2: #3B3B3B;
+  --color-border-z3: #464646;
+  --color-border-glass: color-mix(in srgb, #ffffff 10%, transparent);
+  --color-blue: #29B6F6;
+  --color-blue-hover: #4FC3F7;
+  --color-green: #66BB6A;
+  --color-green-hover: #81C784;
+  --color-yellow: #FFB74D;
+  --color-yellow-hover: #FFCC80;
+  --color-red: #EF5350;
+  --color-red-hover: #E57373;
+  --color-purple: #BA68C8;
+  --color-purple-hover: #CC8FD6;
+  --color-text-base: #ffffff;
+  --color-text-light: color-mix(in srgb, var(--color-text-base) 75%, transparent);
+  --color-text-lighter: color-mix(in srgb, var(--color-text-base) 50%, transparent);
+  --color-text-base-on-primary: #000000;
+}
+
+.c-app {
+  height: 100%;
+  width: 100%;
+  overflow: scroll;
+  background: var(--color-bg-z0);
+  padding-bottom: 64px;
+}
+
+.c-app__body {
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  gap: 16px;
+}
+
+.c-app__footer {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  padding: 12px;
+  background: var(--color-bg-z0);
+  box-shadow: 0 1px 0 0 inset var(--color-border-z0);
+
+  button {
+    width: 100%;
+  }
+}
+
+.c-app__logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-family-headline);
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: bold;
+  color: var(--color-text-base);
+  padding: 8px 0 16px 0;
+  text-transform: uppercase;
+}
+
+.c-app__geo-preview {
+  width: 100%;
+  position: relative;
+  aspect-ratio: 1/1;
+  border-radius: var(--border-radius);
+  background: var(--color-bg-z0);
+  box-shadow: 0 0 0 1px inset var(--color-border-z2);
+  /* padding: 16px; */
+
+  svg {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    fill: var(--color-text-base);
+    stroke-width: 0.5px;
+    stroke: var(--color-border-z2);
+    width: 100%;
+    height: 100%;
+  }
+}
+
+.h-pointer {
+  cursor: pointer;
+}
