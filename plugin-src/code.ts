@@ -53,7 +53,7 @@ figma.ui.onmessage = async (msg) => {
         ));
       }
 
-      const finalGroup = groupAndLock(groups, "Geo-Country");
+      const finalGroup = groupAndLock(groups, "Geo-Globe");
 
       const targetBounds = getTargetBounds();
       const scale = scaleAndPositionGroup(finalGroup, targetBounds as any);

@@ -3,10 +3,11 @@ import type { FeatureCollection, Feature } from "geojson";
 import { GeoPath, geoGraticule, geoPath, geoGraticule10 } from "d3-geo";
 import isoCountries from "i18n-iso-countries";
 import { getCountryData, TCountryCode } from "countries-list";
+import { ProjectionType } from "./types";
 
 export const getPathGenerator = (
   features: Feature | Feature[],
-  projectionType: any,
+  projectionType: ProjectionType,
   defaultScaleMap: Record<string, number>,
   params: {
     scale?: number;            // optional: if undefined, use default fitted scale
@@ -25,7 +26,7 @@ export const getPathGenerator = (
   const combinedFeatures = {
     type: "FeatureCollection",
     features: [...normalizedFeatures, graticuleFeature]
-  };
+  } as FeatureCollection;
 
   const projection = d3Geo[projectionType]();
 
@@ -61,22 +62,21 @@ export const getProjectionPadding = (projectionType: string) => {
   switch(projectionType) {
     case "geoAzimuthalEquidistant":
       return 32
+    case "geoStereographic":
+      return 28;
     case "geoAzimuthalEqualArea":
       return 12;
     case "geoGnomonic":
       return 8;
-    case "geoOrthographic":
-      return 2;
-    case "geoStereographic":
-      return 28;
-    case "geoConicEquidistant":
-      return 2;
     case "geoAlbers":
       return 6;
     case "geoEqualEarth":
       return 4;
     case "geoNaturalEarth1":
       return 3;
+    case "geoOrthographic":
+    case "geoConicEquidistant":
+      return 2;
     default:
       return 0;
   }
