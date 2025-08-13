@@ -20,7 +20,7 @@ import "./App.css";
 const TOPO_JSON: any = { countries110m, countries50m };
 
 const App = () => {
-  const [projectionType, setProjectionType] = useState<ProjectionType>("geoMercator");
+  const [projectionType, setProjectionType] = useState<ProjectionType>("geoOrthographic");
   const [scale, setScale] = useState<number>(120);
   const [rotate, setRotate] = useState<[number, number, number]>([0.1, 0, 0]);
   const [defaultScaleMap, setDefaultScaleMap] = useState<Record<string, number>>({});
