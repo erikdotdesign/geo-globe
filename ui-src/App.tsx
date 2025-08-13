@@ -2,16 +2,18 @@ import { useState, useEffect } from "react";
 import { continents, TContinentCode } from "countries-list";
 import { feature, merge } from "topojson-client";
 import countries110m from "world-atlas/countries-110m.json";
+import countries50m from "world-atlas/countries-50m.json";
 import { Topology, GeometryCollection } from "topojson-specification";
 import type { Feature } from "geojson";
-import { getPathGenerator, getCountryContinentCode, getRelPathData, patchId, getGraticulePathData } from "./helpers";
+import { getPathGenerator, getCountryContinentCode, getRelPathData, patchId, getGraticulePathData, capitalize } from "./helpers";
 import Select from "./Select";
 import Button from "./Button";
 import Control from "./Control";
 import ResetSettingButton from "./ResetSettingButton";
 import "./App.css";
+import { GeoPath } from "d3-geo";
 
-const TOPO_JSON: any = { countries110m };
+const TOPO_JSON: any = { countries110m, countries50m };
 
 const projections = {
   azimuthal: [{
@@ -72,6 +74,7 @@ const App = () => {
   >({});
   const [projectionType, setProjectionType] = useState<string>("geoMercator");
   const [includeGraticules, setIncludeGraticules] = useState<boolean>(true);
+  const [includeOutline, setIncludeOutline] = useState<boolean>(true);
   const [graticulePathData, setGraticulePathData] = useState<string | null>(null);
   const [outlinePathData, setOutlinePathData] = useState<string | null>(null);
   const [scale, setScale] = useState<number>(120);
@@ -122,53 +125,7 @@ const App = () => {
     setDataSet(ds);
   };
 
-  // Load plugin cache
-  useEffect(() => {
-    parent.postMessage({ pluginMessage: { type: "load-storage", key: "cache" } }, "*");
-    window.onmessage = (event) => {
-      const msg = event.data.pluginMessage;
-      if (msg.type === "storage-loaded") {
-        if (msg.key === "cache" && msg.value) {
-          setProjectionType(msg.value.projectionType);
-          setScale(msg.value.scale);
-          setRotate(msg.value.rotate);
-          setIncludeGraticules(msg.value.includeGraticules);
-          setIncludeCountryBorders(msg.value.includeCountryBorders);
-        }
-      }
-    };
-  }, []);
-
-  // Handle updating data set
-  useEffect(() => {
-    handleNewDataSet(dataSet);
-  }, [dataSet]);
-
-  const handlePathData = () => {
-    if (!countryFeatures.length || !countryGeometries.length) return;
-    const continentGeometryMap = getContinentGeometryMap();
-    const projectionFeatures = Object.values(continentGeometryMap);
-    const { pathGenerator, scaleMap } = getPathGenerator(projectionFeatures, projectionType, defaultScaleMap, { scale, rotate });
-
-    setOutlinePathData(pathGenerator({ type: "Sphere" }));
-    setDefaultScaleMap(scaleMap);
-
-    if (scale < scaleMap[projectionType]) {
-      setScale(scaleMap[projectionType]);
-    }
-
-    setContinentPathData(projectionFeatures.map((pf, i) => ({
-      name: (pf.properties as any).name,
-      pathData: getRelPathData(pathGenerator, projectionFeatures[i])
-    })).filter(e => e.pathData));
-
-    if (includeGraticules) {
-      const graticulePathData = getGraticulePathData(pathGenerator);
-      setGraticulePathData(graticulePathData);
-    } else {
-      setGraticulePathData(null);
-    }
-
+  const handleCountryPathData = (pathGenerator: GeoPath) => {
     if (includeCountryBorders) {
       const continentCountryFeatures = getCountryFeaturesByContinent();
 
@@ -197,7 +154,72 @@ const App = () => {
     } else {
       setCountryPathData({});
     }
+  };
+
+  const handleGraticulePathData = (pathGenerator: GeoPath) => {
+    if (includeGraticules) {
+      const graticulePathData = getGraticulePathData(pathGenerator);
+      setGraticulePathData(graticulePathData);
+    } else {
+      setGraticulePathData(null);
+    }
+  };
+
+  const handleOutlinePathData = (pathGenerator: GeoPath) => {
+    if (includeOutline) {
+      setOutlinePathData(pathGenerator({ type: "Sphere" }));
+    } else {
+      setOutlinePathData(null);
+    }
   }
+
+  const handleDefaultScale = (scaleMap: any) => {
+    setDefaultScaleMap(scaleMap);
+    if (scale < scaleMap[projectionType]) {
+      setScale(scaleMap[projectionType]);
+    }
+  };
+
+  const handlePathData = () => {
+    if (!countryFeatures.length || !countryGeometries.length) return;
+    const continentGeometryMap = getContinentGeometryMap();
+    const projectionFeatures = Object.values(continentGeometryMap);
+    const { pathGenerator, scaleMap } = getPathGenerator(projectionFeatures, projectionType, defaultScaleMap, { scale, rotate });
+
+    setContinentPathData(projectionFeatures.map((pf, i) => ({
+      name: (pf.properties as any).name,
+      pathData: getRelPathData(pathGenerator, projectionFeatures[i])
+    })).filter(e => e.pathData));
+
+    handleDefaultScale(scaleMap);
+    handleGraticulePathData(pathGenerator);
+    handleCountryPathData(pathGenerator);
+    handleOutlinePathData(pathGenerator);
+  };
+
+  // Load plugin cache
+  useEffect(() => {
+    parent.postMessage({ pluginMessage: { type: "load-storage", key: "cache" } }, "*");
+    window.onmessage = (event) => {
+      const msg = event.data.pluginMessage;
+      if (msg.type === "storage-loaded") {
+        if (msg.key === "cache" && msg.value) {
+          setProjectionType(msg.value.projectionType);
+          setDataSet(msg.value.dataSet);
+          setScale(msg.value.scale);
+          setRotate(msg.value.rotate);
+          setIncludeGraticules(msg.value.includeGraticules);
+          setIncludeOutline(msg.value.includeOutline);
+          setIncludeCountryBorders(msg.value.includeCountryBorders);
+        }
+      }
+    };
+  }, []);
+
+  // Handle updating data set
+  useEffect(() => {
+    handleNewDataSet(dataSet);
+  }, [dataSet]);
 
   // Handle updating path data
   useEffect(() => {
@@ -205,16 +227,22 @@ const App = () => {
     parent.postMessage({
       pluginMessage: { type: "save-storage", key: "cache", value: {
         projectionType,
+        dataSet,
         scale,
         rotate,
         includeGraticules,
+        includeOutline,
         includeCountryBorders
       }},
     }, "*");
-  }, [includeCountryBorders, includeGraticules, countryFeatures, countryGeometries, projectionType, scale, rotate]);
+  }, [includeCountryBorders, includeGraticules, includeOutline, countryFeatures, countryGeometries, projectionType, scale, rotate, dataSet]);
 
   const handleSetIncludeCountryBorders = (e: React.ChangeEvent<HTMLInputElement>) => {
     setIncludeCountryBorders(e.target.checked);
+  };
+
+  const handleSetDataSet = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    handleNewDataSet(e.target.value);
   };
 
   const createGeoShape = () => {
@@ -243,26 +271,43 @@ const App = () => {
         <div className="c-app__logo">
           geo-globe
         </div>
-        <Select
-          label="Projection"
-          value={projectionType}
-          onChange={(e) => setProjectionType(e.target.value)}>
-          {
-            Object.keys(projections).map((key) => (
-              <optgroup label={key}>
-                {
-                  projections[key].map((p) => (
-                    <option 
-                      key={p.value}
-                      value={p.value}>
-                      {p.name}
-                    </option>
-                  ))
-                }
-              </optgroup>
-            ))
-          }
-        </Select>
+        <div className="c-control-group">
+          <Select
+            label="Projection"
+            value={projectionType}
+            onChange={(e) => setProjectionType(e.target.value)}>
+            {
+              Object.keys(projections).map((key) => (
+                <optgroup label={capitalize(key)}>
+                  {
+                    projections[key].map((p) => (
+                      <option 
+                        key={p.value}
+                        value={p.value}>
+                        {p.name}
+                      </option>
+                    ))
+                  }
+                </optgroup>
+              ))
+            }
+          </Select>
+          <Select
+            label="Detail"
+            value={dataSet}
+            onChange={handleSetDataSet}>
+            <option 
+              key={"countries110m"}
+              value={"countries110m"}>
+              {`Low (1:110m scale)`}
+            </option>
+            <option 
+              key={"countries50m"}
+              value={"countries50m"}>
+              {`High (1:50m scale)`}
+            </option>
+          </Select>
+        </div>
         <div className="c-control-group">
           <Control
             as="input"
@@ -271,9 +316,9 @@ const App = () => {
             min={defaultScaleMap[projectionType] || 0}
             max="1000" 
             value={scale}
-            right={<span>{(Number(scale) - Number(defaultScaleMap[projectionType])).toFixed(0)}</span>}
+            right={<span>{(scale - defaultScaleMap[projectionType]).toFixed(0)}</span>}
             rightReadOnly
-            onChange={(e) => setScale(e.target.value)} />
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setScale(e.target.valueAsNumber)} />
           <ResetSettingButton
             onClick={() => setScale(defaultScaleMap[projectionType])} />
         </div>
@@ -285,9 +330,9 @@ const App = () => {
             min="-180" 
             max="180" 
             value={rotate[0]}
-            right={<span>{rotate[0]}</span>}
+            right={<span>{rotate[0].toFixed(0)}</span>}
             rightReadOnly
-            onChange={(e) => setRotate([e.target.value, rotate[1], rotate[2]])} />
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRotate([e.target.valueAsNumber, rotate[1], rotate[2]])} />
           <ResetSettingButton
             onClick={() => setRotate([0, rotate[1], rotate[2]])} />
         </div>
@@ -295,13 +340,13 @@ const App = () => {
           <Control
             as="input"
             type="range"
-            label="Rotate Pha"
+            label="Rotate Phi"
             min="-180" 
             max="180" 
             value={rotate[1]}
-            right={<span>{rotate[1]}</span>}
+            right={<span>{rotate[1].toFixed(0)}</span>}
             rightReadOnly
-            onChange={(e) => setRotate([rotate[0], e.target.value, rotate[2]])} />
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRotate([rotate[0], e.target.valueAsNumber, rotate[2]])} />
           <ResetSettingButton
             onClick={() => setRotate([rotate[0], 0, rotate[2]])} />
         </div>
@@ -314,7 +359,7 @@ const App = () => {
           value={rotate[2]}
           onChange={(e) => setRotate([rotate[0], rotate[1], e.target.value])} /> */}
         <div className="c-app__geo-preview">
-          <svg style={{fill: "none"}}>
+          <svg>
             <path d={graticulePathData ? graticulePathData : ""} />
           </svg>
           <svg>
@@ -333,22 +378,28 @@ const App = () => {
               </g>
             ))}
           </svg>
-          <svg style={{fill: "none"}}>
+          <svg>
             <path d={outlinePathData ? outlinePathData : ""} />
           </svg>
         </div>
         <Control
           as="input"
           type="checkbox"
-          label="Include Graticule"
-          checked={includeGraticules}
-          onChange={(e) => setIncludeGraticules(e.target.checked)} />
-        <Control
-          as="input"
-          type="checkbox"
           label="Include countries"
           checked={includeCountryBorders}
           onChange={handleSetIncludeCountryBorders} />
+        <Control
+          as="input"
+          type="checkbox"
+          label="Include Graticules"
+          checked={includeGraticules}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setIncludeGraticules(e.target.checked)} />
+        <Control
+          as="input"
+          type="checkbox"
+          label="Include Outline"
+          checked={includeOutline}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setIncludeOutline(e.target.checked)} />
       </section>
       <footer className="c-app__footer">
         <Button 

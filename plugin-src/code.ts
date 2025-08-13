@@ -27,7 +27,10 @@ figma.ui.onmessage = async (msg) => {
       const groups = [];
 
       if (graticulePathData.length) {
-        groups.push(createPathDataGroup({name: "Graticules", pathData: graticulePathData}, true));
+        groups.push(createPathDataGroup(
+          {name: "Graticules", pathData: graticulePathData}, 
+          { outline: true, opacity: 0.25 }
+        ));
       }
 
       if (continentPathData.length) {
@@ -44,7 +47,10 @@ figma.ui.onmessage = async (msg) => {
       }
 
       if (outlinePathData) {
-        groups.push(createPathDataGroup({name: "Outline", pathData: outlinePathData}, true));
+        groups.push(createPathDataGroup(
+          {name: "Outline", pathData: outlinePathData}, 
+          { outline: true }
+        ));
       }
 
       const finalGroup = groupAndLock(groups, "Geo-Country");

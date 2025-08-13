@@ -125,41 +125,64 @@ const isValidPath = (pathData: string) => {
   return /[MLCQAZmlcqa]/.test(cleaned) && /[LCQAZlcqaz]/.test(cleaned);
 }
 
-export const createVectorFromPath = (pathData: string, bgColor: RGB, outline: boolean = false): VectorNode => {
+type VectorParams = {
+  outline?: boolean;
+  strokeWeight?: number;
+  opacity?: number;
+  fillColorOverride?: RGB;
+};
+
+export const createVectorFromPath = (
+  pathData: string,
+  bgColor: RGB,
+  params: VectorParams = {}
+): VectorNode => {
+  const { outline = false, strokeWeight = 0.5, opacity = 1, fillColorOverride } = params;
   const geoFill = getGeoFill();
+
   const vector = figma.createVector();
   vector.vectorPaths = [{
     windingRule: "NONZERO",
     data: cleanSvgPathData(pathData),
   }];
-  vector.fills = outline ? [] : [{ type: "SOLID", color: geoFill }];
-  vector.strokes = [{ type: "SOLID", color: outline ? geoFill : bgColor }];
-  vector.strokeWeight = 0.5;
+
+  vector.fills = outline
+    ? []
+    : [{ type: "SOLID", color: fillColorOverride ?? geoFill }];
+
+  vector.strokes = [{
+    type: "SOLID",
+    color: outline
+      ? (fillColorOverride ?? geoFill)
+      : bgColor
+  }];
+
+  vector.opacity = opacity;
+
+  vector.strokeWeight = strokeWeight;
   vector.lockAspectRatio();
   return vector;
 };
 
 export const createPathDataGroup = (
-  { name, pathData }: { name: string; pathData: string }, 
-  outline?: boolean
+  { name, pathData }: { name: string; pathData: string },
+  params: VectorParams = {}
 ): GroupNode => {
   const bgColor = getBackgroundColor();
   const subpaths = splitIntoSubpaths(pathData);
 
   const vectors = subpaths
-    .filter(isValidPath) // Filter out degenerate paths
-    .map(subpath => createVectorFromPath(subpath, bgColor, outline));
+    .filter(isValidPath)
+    .map(subpath => createVectorFromPath(subpath, bgColor, params));
 
-  const group = groupAndLock(vectors, name);
-  return group;
+  return groupAndLock(vectors, name);
 };
 
 export const createPathDataGroups = (
-  groupName: string, 
-  pathDataGroups: { name: string; pathData: string }[], 
-  outline?: boolean
+  groupName: string,
+  pathDataGroups: { name: string; pathData: string }[],
+  params: VectorParams = {}
 ): GroupNode => {
-  const groups = pathDataGroups.map((e) => createPathDataGroup(e, outline));
-  const group = groupAndLock(groups, groupName);
-  return group;
+  const groups = pathDataGroups.map(e => createPathDataGroup(e, params));
+  return groupAndLock(groups, groupName);
 };
