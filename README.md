@@ -57,8 +57,8 @@
 
 ## Related Plugins
 
-- [geo-country](#) – Continent/country vectors
-- [geo-usa](#) – USA nation/state/county vectors
+- [geo-country](https://github.com/erikdotdesign/geo-country) – Continent/country vectors
+- [geo-usa](https://github.com/erikdotdesign/geo-usa) – USA nation/state/county vectors
 
 ## Dev Info
 
